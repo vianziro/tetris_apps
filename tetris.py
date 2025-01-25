@@ -1,9 +1,30 @@
+"""Game Tetris
+
+Game klasik Tetris yang diimplementasikan menggunakan Pygame.
+Permainan ini memungkinkan pemain untuk mengontrol dan menempatkan berbagai bentuk tetromino
+yang jatuh dari atas layar. Tujuannya adalah menyusun tetromino-tetromino tersebut
+untuk membentuk garis horizontal yang sempurna.
+
+Fitur:
+- 7 bentuk tetromino klasik (I, O, T, L, J, S, Z)
+- Sistem skor berdasarkan jumlah baris yang dihapus
+- Kecepatan jatuh meningkat seiring bertambahnya skor
+- Tampilan waktu bermain dan skor
+- Musik latar (jika file musik tersedia)
+
+Kontrol:
+- Panah Kiri: Geser tetromino ke kiri
+- Panah Kanan: Geser tetromino ke kanan
+- Panah Bawah: Percepat jatuhnya tetromino
+- Panah Atas: Putar tetromino
+"""
+
 import pygame
 import random
-
+import time
 
 pygame.init()
-
+pygame.mixer.init()
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -15,41 +36,45 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 ORANGE = (255, 165, 0)
 
-# Game dimensions
 BLOCK_SIZE = 30
 GRID_WIDTH = 10
 GRID_HEIGHT = 20
-SCREEN_WIDTH = BLOCK_SIZE * (GRID_WIDTH + 6)  # Extra space for score
+SCREEN_WIDTH = BLOCK_SIZE * (GRID_WIDTH + 6)
 SCREEN_HEIGHT = BLOCK_SIZE * GRID_HEIGHT
 
-# Tetromino shapes
 SHAPES = [
-    [[1, 1, 1, 1]],  # I
-    [[1, 1], [1, 1]],  # O
-    [[1, 1, 1], [0, 1, 0]],  # T
-    [[1, 1, 1], [1, 0, 0]],  # L
-    [[1, 1, 1], [0, 0, 1]],  # J
-    [[1, 1, 0], [0, 1, 1]],  # S
-    [[0, 1, 1], [1, 1, 0]],  # Z
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[1, 1, 1], [0, 1, 0]],
+    [[1, 1, 1], [1, 0, 0]],
+    [[1, 1, 1], [0, 0, 1]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
 ]
 
 COLORS = [CYAN, YELLOW, MAGENTA, ORANGE, BLUE, GREEN, RED]
 
-
 class Tetris:
     def __init__(self):
+        """Inisialisasi game Tetris dengan pengaturan awal."""
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Tetris")
         self.clock = pygame.time.Clock()
+        self.start_time = time.time()
+        self.elapsed_time = 0
+        self.base_fall_speed = 500
+        self.current_fall_speed = self.base_fall_speed
         self.reset_game()
 
     def reset_game(self):
+        """Mengatur ulang permainan ke kondisi awal."""
         self.grid = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
         self.current_piece = self.new_piece()
         self.game_over = False
         self.score = 0
 
     def new_piece(self):
+        """Membuat tetromino baru dengan bentuk dan warna acak."""
         shape = random.choice(SHAPES)
         color = COLORS[SHAPES.index(shape)]
         return {
@@ -60,6 +85,7 @@ class Tetris:
         }
 
     def valid_move(self, piece, x, y):
+        """Memeriksa apakah pergerakan tetromino valid."""
         for i, row in enumerate(piece["shape"]):
             for j, cell in enumerate(row):
                 if cell:
@@ -75,11 +101,13 @@ class Tetris:
         return True
 
     def rotate_piece(self, piece):
+        """Memutar tetromino searah jarum jam."""
         rotated = list(zip(*piece["shape"][::-1]))
         if self.valid_move({"shape": rotated, "x": piece["x"], "y": piece["y"]}, 0, 0):
             piece["shape"] = rotated
 
     def place_piece(self):
+        """Menempatkan tetromino pada grid permainan."""
         for i, row in enumerate(self.current_piece["shape"]):
             for j, cell in enumerate(row):
                 if cell:
@@ -88,6 +116,7 @@ class Tetris:
                     ] = self.current_piece["color"]
 
     def clear_lines(self):
+        """Menghapus baris yang terisi penuh dan menambah skor."""
         lines_cleared = 0
         i = GRID_HEIGHT - 1
         while i >= 0:
@@ -97,12 +126,16 @@ class Tetris:
                 lines_cleared += 1
             else:
                 i -= 1
-        self.score += lines_cleared * 100
+        if lines_cleared > 0:
+            self.score += (2 ** (lines_cleared - 1)) * 100
+            self.current_fall_speed = max(100, self.base_fall_speed - (self.score // 1000) * 50)
 
     def draw(self):
+        """Menggambar seluruh elemen permainan ke layar."""
         self.screen.fill(BLACK)
+        
+        self.elapsed_time = int(time.time() - self.start_time)
 
-        # Draw grid
         for i in range(GRID_HEIGHT):
             for j in range(GRID_WIDTH):
                 pygame.draw.rect(
@@ -123,7 +156,6 @@ class Tetris:
                         ],
                     )
 
-        # Draw current piece
         if self.current_piece:
             for i, row in enumerate(self.current_piece["shape"]):
                 for j, cell in enumerate(row):
@@ -139,16 +171,25 @@ class Tetris:
                             ],
                         )
 
-        # Draw score
         font = pygame.font.Font(None, 36)
         score_text = font.render(f"Score: {self.score}", True, WHITE)
         self.screen.blit(score_text, [GRID_WIDTH * BLOCK_SIZE + 10, 10])
+        
+        minutes = self.elapsed_time // 60
+        seconds = self.elapsed_time % 60
+        time_text = font.render(f"Time: {minutes:02d}:{seconds:02d}", True, WHITE)
+        self.screen.blit(time_text, [GRID_WIDTH * BLOCK_SIZE + 10, 50])
 
         pygame.display.flip()
 
     def run(self):
+        """Menjalankan loop utama permainan."""
         fall_time = 0
-        fall_speed = 500  # Time in milliseconds
+        try:
+            pygame.mixer.music.load("tetris_theme.mp3")
+            pygame.mixer.music.play(-1)
+        except:
+            print("Could not load background music")
 
         while not self.game_over:
             fall_time += self.clock.get_rawtime()
@@ -170,7 +211,7 @@ class Tetris:
                     if event.key == pygame.K_UP:
                         self.rotate_piece(self.current_piece)
 
-            if fall_time >= fall_speed:
+            if fall_time >= self.current_fall_speed:
                 if self.valid_move(self.current_piece, 0, 1):
                     self.current_piece["y"] += 1
                 else:
@@ -183,7 +224,6 @@ class Tetris:
 
             self.draw()
 
-        # Game over screen
         font = pygame.font.Font(None, 48)
         game_over_text = font.render("Game Over!", True, WHITE)
         self.screen.blit(game_over_text, [SCREEN_WIDTH // 3, SCREEN_HEIGHT // 2])
